@@ -37,8 +37,9 @@ The vault is the database. Every note type is plain markdown with a fixed YAML f
     /Goals/
       2026-q3-improve-code-review-turnaround.md
     Development-Plan.md     ← single evolving note per person
+    Overview.md             ← AI-generated person overview (optional, regenerable)
 ```
-- Archiving/offboarding a person preserves history — never delete person folders. [TO BE DETERMINED — populate after first implementation: exact archive mechanism]
+- Archiving/offboarding a person preserves history — archive flips `status: archived` in `_index.md` frontmatter only; person folders are never deleted, moved, or renamed.
 
 ## Note Types & Frontmatter Schemas
 
@@ -78,8 +79,17 @@ Filenames are slugified kebab-case titles with `-2`/`-3` suffixing on duplicates
 |-------|---------|
 | `type` | `dev-plan` |
 | `person` | person name |
-| `last_reviewed` | drives the stale-plan reminder banner (configurable cadence, default 90 days) |
-Body: growth areas, skills, target role/level, stretch opportunities, dated revision log. Links goals and 1:1 notes as evidence.
+| `last_reviewed` | ISO date; set to today on create; `markReviewed` rewrites ONLY this field (byte-for-byte otherwise) and appends `- YYYY-MM-DD — reviewed` to the body's Revision log section (same-day repeats don't duplicate) |
+Body sections from the template: Growth areas, Skills to build, Target role / level, Stretch opportunities, Evidence (wiki-links to Goals + 1:1 folders), Revision log. Dashboard freshness: stale when days since `last_reviewed` >= `devPlanReviewDays` (default 90; exactly 90 = stale); missing/non-ISO `last_reviewed` = stale "never reviewed"; no plan = "no-plan"; archived people excluded.
+
+### `overview` (`Overview.md`, AI-generated)
+| Field | Purpose |
+|-------|---------|
+| `type` | `overview` |
+| `person` | person name |
+| `generated_at` | local YYYY-MM-DD at write time |
+| `model` | the Ollama model used |
+Body = the user-reviewed (possibly edited) AI draft. Created or replaced in place by the explicit "Write Overview.md" button in the draft modal — never auto-written on generation; regeneration replaces the note (product intent: regenerable AI output).
 
 ## Carry-Forward Rule
 Incomplete action items from a person's most recent 1:1 automatically become agenda items in the next 1:1 note. Completion is tracked by checkbox state in the body — the only body content the plugin reads. Implemented by the exported pure parser `extractOpenActionItems(body)`:

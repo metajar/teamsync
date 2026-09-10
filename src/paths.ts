@@ -55,3 +55,11 @@ export function devPlanPath(
 ): string {
 	return joinPath(personFolder(settings, personName), settings.devPlanFile);
 }
+
+/** e.g. "Team/Jane Doe/Overview.md" */
+export function overviewPath(
+	settings: TeamSyncSettings,
+	personName: string,
+): string {
+	return joinPath(personFolder(settings, personName), settings.overviewFile);
+}

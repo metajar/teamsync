@@ -36,11 +36,19 @@ export interface GoalEntry {
 	status: string;
 }
 
+/** A dev-plan note's rollup-relevant frontmatter. */
+export interface DevPlanEntry {
+	person: string;
+	/** ISO date from frontmatter; "" when the field is missing/not a string. */
+	lastReviewed: string;
+}
+
 /** Everything the dashboard needs, flattened from the cache walk. */
 export interface DashboardData {
 	people: PersonEntry[];
 	oneOnOnes: OneOnOneEntry[];
 	goals: GoalEntry[];
+	devPlans: DevPlanEntry[];
 }
 
 /** Structural slice of a `TFile` — just what the walker reads. */
@@ -70,13 +78,19 @@ export interface TeamRow {
 	openActionItems: number;
 	/** Passive display flag only — active notifications are an open PRD question. */
 	overdue: boolean;
+	/** Dev-plan review cadence: no plan yet, fresh, or stale (passive display). */
+	devPlanState: "no-plan" | "fresh" | "stale";
+	/** ISO date of the plan's last review; null with no plan or none recorded. */
+	devPlanLastReviewed: string | null;
+	/** Days since the last review; null when there is nothing to measure. */
+	devPlanDaysSinceReview: number | null;
 }
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 /**
  * Walk the vault's markdown files via the metadata cache and flatten every
- * person / one-on-one / goal note into plain data. Notes without cached
+ * person / one-on-one / goal / dev-plan note into plain data. Notes without cached
  * frontmatter, without a `type`, or missing their linking field (`name` /
  * `person`) are ignored — the dashboard only ever shows typed notes.
  */
@@ -84,7 +98,12 @@ export function collectDashboardData(
 	files: DashboardFile[],
 	cache: DashboardCache,
 ): DashboardData {
-	const data: DashboardData = { people: [], oneOnOnes: [], goals: [] };
+	const data: DashboardData = {
+		people: [],
+		oneOnOnes: [],
+		goals: [],
+		devPlans: [],
+	};
 	for (const file of files) {
 		const frontmatter = cache.getCache(file.path)?.frontmatter;
 		if (!frontmatter) continue;
@@ -120,7 +139,16 @@ export function collectDashboardData(
 				data.goals.push({ person, status: stringOrEmpty(frontmatter.status) });
 				break;
 			}
-			// Other note types (dev-plan, anything user-made) don't feed the table.
+			case "dev-plan": {
+				const person = stringOrEmpty(frontmatter.person);
+				if (person === "") continue;
+				data.devPlans.push({
+					person,
+					lastReviewed: stringOrEmpty(frontmatter.last_reviewed),
+				});
+				break;
+			}
+			// Other note types (anything user-made) don't feed the table.
 		}
 	}
 	return data;
@@ -130,9 +158,16 @@ export function collectDashboardData(
  * Pure rollup: one row per ACTIVE person (archived excluded, duplicates
  * collapsed to the first index note), with the latest 1:1 by frontmatter
  * date then creation time, days since it, the count of goals not `done`,
- * and the latest note's `action_items_open`. Rows sort by name.
+ * the latest note's `action_items_open`, and dev-plan freshness against
+ * `devPlanReviewDays` (stale at >= threshold days since `last_reviewed`; a
+ * plan without a valid `last_reviewed` counts as never reviewed, i.e.
+ * stale). Rows sort by name.
  */
-export function computeTeamRows(data: DashboardData, today: string): TeamRow[] {
+export function computeTeamRows(
+	data: DashboardData,
+	today: string,
+	devPlanReviewDays: number,
+): TeamRow[] {
 	const latestByPerson = new Map<string, OneOnOneEntry>();
 	for (const note of data.oneOnOnes) {
 		const current = latestByPerson.get(note.person);
@@ -147,6 +182,14 @@ export function computeTeamRows(data: DashboardData, today: string): TeamRow[] {
 		openGoalsByPerson.set(goal.person, (openGoalsByPerson.get(goal.person) ?? 0) + 1);
 	}
 
+	// One plan per person by design; a stray duplicate keeps the first found.
+	const devPlanByPerson = new Map<string, DevPlanEntry>();
+	for (const plan of data.devPlans) {
+		if (!devPlanByPerson.has(plan.person)) {
+			devPlanByPerson.set(plan.person, plan);
+		}
+	}
+
 	const rows: TeamRow[] = [];
 	const seen = new Set<string>();
 	for (const person of data.people) {
@@ -157,6 +200,18 @@ export function computeTeamRows(data: DashboardData, today: string): TeamRow[] {
 		const lastDate = latest && ISO_DATE.test(latest.date) ? latest.date : null;
 		const daysSince =
 			lastDate !== null ? daysBetween(lastDate, today) : null;
+
+		const plan = devPlanByPerson.get(person.name);
+		const planReviewed =
+			plan && ISO_DATE.test(plan.lastReviewed) ? plan.lastReviewed : null;
+		const planDaysSince =
+			planReviewed !== null ? daysBetween(planReviewed, today) : null;
+		const devPlanState = !plan
+			? "no-plan"
+			: planReviewed === null || planDaysSince! >= devPlanReviewDays
+				? "stale"
+				: "fresh";
+
 		rows.push({
 			name: person.name,
 			indexPath: person.indexPath,
@@ -165,6 +220,9 @@ export function computeTeamRows(data: DashboardData, today: string): TeamRow[] {
 			openGoals: openGoalsByPerson.get(person.name) ?? 0,
 			openActionItems: latest?.actionItemsOpen ?? 0,
 			overdue: daysSince !== null && daysSince >= OVERDUE_THRESHOLD_DAYS,
+			devPlanState,
+			devPlanLastReviewed: planReviewed,
+			devPlanDaysSinceReview: planDaysSince,
 		});
 	}
 	return rows.sort((a, b) => a.name.localeCompare(b.name));
@@ -175,8 +233,13 @@ export function buildTeamRows(
 	source: DashboardFileSource,
 	cache: DashboardCache,
 	today: string,
+	devPlanReviewDays: number,
 ): TeamRow[] {
-	return computeTeamRows(collectDashboardData(source.getMarkdownFiles(), cache), today);
+	return computeTeamRows(
+		collectDashboardData(source.getMarkdownFiles(), cache),
+		today,
+		devPlanReviewDays,
+	);
 }
 
 /** Whole days from `fromISO` to `toISO`, both `YYYY-MM-DD` (UTC math, no DST). */

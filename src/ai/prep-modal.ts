@@ -5,11 +5,10 @@ import { OneOnOneService } from "../one-on-one.service";
 import type { PrepSource } from "./prep-context";
 
 /**
- * The two modals of the AI prep flow (see .mex/context/ollama.md,
- * Transparency & Trust Rules). UI lives here; vault access goes through
- * OneOnOneService and network access goes through OllamaClient — neither
- * happens inside these modals except via callbacks handed in by the
- * command module.
+ * The modals of the AI flows (see .mex/context/ollama.md, Transparency &
+ * Trust Rules). UI lives here; vault access goes through services and
+ * network access goes through OllamaClient — neither happens inside these
+ * modals except via callbacks handed in by the command module.
  */
 
 /**
@@ -62,35 +61,37 @@ export class SendPreviewModal extends Modal {
 	}
 }
 
-export interface PrepDraftModalOptions {
-	plugin: TeamSyncPlugin;
-	personName: string;
-	draft: string;
-	sources: PrepSource[];
-}
-
 /**
- * Editable AI draft. Framed as a starting point, not a source of truth,
- * with the citations it drew from. Nothing is written to the vault until
- * the user explicitly picks an action — Copy or Insert into a new 1:1 note.
+ * Editable AI draft shared by the AI flows (prep brief, person overview).
+ * Framed as a starting point, not a source of truth, with the citations it
+ * drew from. Nothing is written to the vault until the user explicitly picks
+ * the subclass's primary action — Copy alone writes nothing.
  */
-export class PrepDraftModal extends Modal {
+export abstract class AIDraftModal extends Modal {
 	/** Live draft text — bound to the textarea, so edits survive button clicks. */
 	draftText: string;
-	readonly personName: string;
 	readonly sources: PrepSource[];
-	private readonly plugin: TeamSyncPlugin;
+	private readonly title: string;
+	private readonly primaryLabel: string;
 
-	constructor(app: App, options: PrepDraftModalOptions) {
+	protected constructor(
+		app: App,
+		options: {
+			title: string;
+			draft: string;
+			sources: PrepSource[];
+			primaryLabel: string;
+		},
+	) {
 		super(app);
-		this.plugin = options.plugin;
-		this.personName = options.personName;
-		this.sources = options.sources;
+		this.title = options.title;
 		this.draftText = options.draft;
+		this.sources = options.sources;
+		this.primaryLabel = options.primaryLabel;
 	}
 
 	override onOpen(): void {
-		this.titleEl.setText(`AI draft — 1:1 prep for ${this.personName}`);
+		this.titleEl.setText(this.title);
 
 		this.contentEl.createEl("p", {
 			text:
@@ -120,9 +121,9 @@ export class PrepDraftModal extends Modal {
 			)
 			.addButton((button) =>
 				button
-					.setButtonText("Insert into new 1:1 note")
+					.setButtonText(this.primaryLabel)
 					.setCta()
-					.onClick(() => void this.insertIntoNote()),
+					.onClick(() => void this.runPrimary(this.draftText)),
 			);
 	}
 
@@ -139,19 +140,63 @@ export class PrepDraftModal extends Modal {
 	}
 
 	/**
+	 * Primary button handler: run the subclass action with the current (edited)
+	 * draft, surfacing any error as a Notice and leaving the modal open for a
+	 * retry. Also the shared test seam.
+	 */
+	async runPrimary(draft: string): Promise<void> {
+		try {
+			await this.runPrimaryAction(draft);
+		} catch (error) {
+			new Notice(draftErrorMessage(error));
+		}
+	}
+
+	/** What the primary (CTA) button does — e.g. insert into a note, write a file. */
+	protected abstract runPrimaryAction(draft: string): Promise<void>;
+}
+
+export interface PrepDraftModalOptions {
+	plugin: TeamSyncPlugin;
+	personName: string;
+	draft: string;
+	sources: PrepSource[];
+}
+
+/** The prep flow's draft modal: insert the edited draft into a new 1:1 note. */
+export class PrepDraftModal extends AIDraftModal {
+	readonly personName: string;
+	private readonly plugin: TeamSyncPlugin;
+
+	constructor(app: App, options: PrepDraftModalOptions) {
+		super(app, {
+			title: `AI draft — 1:1 prep for ${options.personName}`,
+			draft: options.draft,
+			sources: options.sources,
+			primaryLabel: "Insert into new 1:1 note",
+		});
+		this.plugin = options.plugin;
+		this.personName = options.personName;
+	}
+
+	protected override async runPrimaryAction(draft: string): Promise<void> {
+		return this.insertIntoNote(draft);
+	}
+
+	/**
 	 * Create today's 1:1 note (with the usual action-item carry-forward) and
 	 * append the edited draft to its body, then open the note. The user has
 	 * seen and edited the draft in this modal — that review is the write's
 	 * authorization, so this is the only sanctioned write path for AI output.
 	 */
-	async insertIntoNote(): Promise<void> {
+	async insertIntoNote(draft: string = this.draftText): Promise<void> {
 		const service = new OneOnOneService(
 			this.plugin.app.vault,
 			this.plugin.settings,
 		);
 		try {
 			const file = await service.createOneOnOne(this.personName);
-			await service.appendToOneOnOne(file, this.draftText);
+			await service.appendToOneOnOne(file, draft);
 			this.close();
 			const leaf = this.plugin.app.workspace.getLeaf(true);
 			await leaf.openFile(file);
@@ -159,6 +204,48 @@ export class PrepDraftModal extends Modal {
 		} catch (error) {
 			new Notice(draftErrorMessage(error));
 		}
+	}
+}
+
+export interface OverviewDraftModalOptions {
+	personName: string;
+	draft: string;
+	sources: PrepSource[];
+	/**
+	 * Create-or-replace the person's Overview note with the edited draft.
+	 * Supplied by the command layer (the thin writer seam); it throws on
+	 * failure so this modal can surface the error and stay open.
+	 */
+	onWrite: (draft: string) => Promise<void>;
+}
+
+/**
+ * The overview flow's draft modal: write the edited draft to the person's
+ * Overview note. Replacing an existing Overview only ever happens from this
+ * explicit button, after the user has seen and could edit the content —
+ * never automatically on generation.
+ */
+export class OverviewDraftModal extends AIDraftModal {
+	private readonly onWrite: OverviewDraftModalOptions["onWrite"];
+
+	constructor(app: App, options: OverviewDraftModalOptions) {
+		super(app, {
+			title: `AI draft — overview for ${options.personName}`,
+			draft: options.draft,
+			sources: options.sources,
+			primaryLabel: "Write Overview.md",
+		});
+		this.onWrite = options.onWrite;
+	}
+
+	/** The "Write Overview.md" button — also the test seam. */
+	async writeOverview(draft: string = this.draftText): Promise<void> {
+		await this.runPrimary(draft);
+	}
+
+	protected override async runPrimaryAction(draft: string): Promise<void> {
+		await this.onWrite(draft);
+		this.close();
 	}
 }
 

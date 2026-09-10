@@ -7,8 +7,10 @@ import type { TeamSyncSettings } from "../settings";
 import { buildNote, splitFrontmatter } from "../frontmatter";
 import { OllamaError } from "../ollama-client";
 import { PrepDraftModal, SendPreviewModal } from "../ai/prep-modal";
+import { OverviewDraftModal } from "../ai/prep-modal";
 import {
 	registerAICommands,
+	runGenerateOverview,
 	runPrepOneOnOne,
 	type PrepAIProvider,
 	type PrepCommandOptions,
@@ -140,6 +142,21 @@ describe("registerAICommands", () => {
 		return found as T | undefined;
 	}
 
+	/** Run the overview command through the person picker and choose someone. */
+	async function pickOverviewPerson(
+		person: string,
+		options: PrepCommandOptions,
+	): Promise<void> {
+		await runGenerateOverview(plugin, options);
+		await flush();
+		const picker = [...openedModals]
+			.reverse()
+			.find((modal): modal is PersonSuggestModal => modal instanceof PersonSuggestModal);
+		expect(picker).toBeInstanceOf(PersonSuggestModal);
+		picker!.onChooseSuggestion(person);
+		await flush();
+	}
+
 	beforeEach(async () => {
 		vault = createMockVault();
 		await seedTeam();
@@ -180,8 +197,12 @@ describe("registerAICommands", () => {
 	});
 
 	it("registers the teamsync-prep-one-on-one command", () => {
-		expect(Object.keys(commands)).toEqual(["teamsync-prep-one-on-one"]);
+		expect(Object.keys(commands)).toEqual([
+			"teamsync-prep-one-on-one",
+			"teamsync-generate-overview",
+		]);
 		expect(commands["teamsync-prep-one-on-one"]?.name).toBe("Prep 1:1 with AI");
+		expect(commands["teamsync-generate-overview"]?.name).toBe("Generate Overview");
 	});
 
 	it("exits before any vault read or modal when no model is configured", async () => {
@@ -328,5 +349,183 @@ describe("registerAICommands", () => {
 		expect(() => draft.onOpen()).not.toThrow();
 		// Draft text survives onOpen (textarea binding keeps draftText intact).
 		expect(draft.draftText).toBe("BRIEF");
+	});
+
+	it("overview: exits before any vault read or modal when no model is configured", async () => {
+		commands["teamsync-generate-overview"]?.callback();
+		await flush();
+		expect(hoisted.notices).toContain(
+			"TeamSync: No AI model configured — see settings (Ollama section).",
+		);
+		expect(openedModals).toHaveLength(0);
+	});
+
+	it("overview: notices and exits before the preview when there is nothing to summarize", async () => {
+		await seedNote(
+			vault,
+			"Team/New Person/_index.md",
+			buildNote(
+				{ type: "person", name: "New Person", status: "active" },
+				"\n# New Person\n",
+			),
+		);
+		enableAI();
+		await runGenerateOverview(plugin);
+		await flush();
+		const picker = [...openedModals]
+			.reverse()
+			.find((modal): modal is PersonSuggestModal => modal instanceof PersonSuggestModal);
+		picker!.onChooseSuggestion("New Person");
+		await flush();
+
+		expect(
+			hoisted.notices.some((message) => message.includes("nothing to summarize yet")),
+		).toBe(true);
+		// Exit before the preview modal — nothing is ever transmitted.
+		expect(modalOf(SendPreviewModal)).toBeUndefined();
+	});
+
+	it("overview: shows the send preview with the exact prompt; Cancel sends and writes nothing", async () => {
+		enableAI();
+		const { provider, calls } = fakeProvider("OVERVIEW");
+		await pickOverviewPerson("Jane Doe", optionsFor(provider));
+
+		const preview = modalOf(SendPreviewModal);
+		expect(preview).toBeInstanceOf(SendPreviewModal);
+		expect(preview!.targetUrl).toBe(plugin.settings.ollamaUrl);
+		expect(preview!.prompt).toContain("worried about launch load.");
+		expect(preview!.prompt).toContain("Improve reviews");
+
+		// Cancel = close without confirmSend: no generate, no write, no draft.
+		preview!.close();
+		await flush();
+		expect(calls).toHaveLength(0);
+		expect(modalOf(OverviewDraftModal)).toBeUndefined();
+		expect(vault.getContent("Team/Jane Doe/Overview.md")).toBeUndefined();
+	});
+
+	it("overview: sends only after confirmation, then shows the editable draft with citations", async () => {
+		enableAI({ ollamaTemperature: 0.2 });
+		const { provider, calls } = fakeProvider("RAW OVERVIEW");
+		await pickOverviewPerson("Jane Doe", optionsFor(provider));
+		const preview = modalOf(SendPreviewModal)!;
+		preview.confirmSend();
+		await flush();
+
+		expect(calls).toHaveLength(1);
+		expect(calls[0]).toEqual({
+			model: "llama3",
+			prompt: preview.prompt, // exactly what the preview displayed
+			temperature: 0.2,
+		});
+
+		const draft = modalOf(OverviewDraftModal);
+		expect(draft).toBeInstanceOf(OverviewDraftModal);
+		expect(draft!.draftText).toBe("RAW OVERVIEW");
+		expect(draft!.sources).toContainEqual({
+			path: "Team/Jane Doe/1-on-1s/2026-09-02.md",
+			date: "2026-09-02",
+			kind: "one-on-one",
+		});
+	});
+
+	it("overview: Write button creates Overview.md with exact frontmatter and the EDITED body", async () => {
+		vi.useFakeTimers();
+		vi.setSystemTime(new Date(2026, 8, 10, 9, 0, 0)); // local 2026-09-10
+		try {
+			enableAI();
+			const { provider } = fakeProvider("RAW OVERVIEW");
+			await pickOverviewPerson("Jane Doe", optionsFor(provider));
+			modalOf(SendPreviewModal)!.confirmSend();
+			await flush();
+
+			const draft = modalOf(OverviewDraftModal)!;
+			draft.draftText = "EDITED OVERVIEW"; // the user edits in the textarea
+			await draft.writeOverview();
+			await flush();
+
+			const path = "Team/Jane Doe/Overview.md";
+			const content = vault.getContent(path);
+			expect(content).toBeDefined();
+			const { frontmatter, body } = splitFrontmatter(content!);
+			expect(frontmatter.type).toBe("overview");
+			expect(frontmatter.person).toBe("Jane Doe");
+			expect(frontmatter.generated_at).toBe("2026-09-10");
+			expect(frontmatter.model).toBe("llama3");
+			// User edits win over the raw model output.
+			expect(body).toContain("EDITED OVERVIEW");
+			expect(body).not.toContain("RAW OVERVIEW");
+			expect(openedFiles.map((file) => file.path)).toEqual([path]);
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
+	it("overview: Write button REPLACES an existing Overview.md in place", async () => {
+		vi.useFakeTimers();
+		vi.setSystemTime(new Date(2026, 8, 10, 9, 0, 0));
+		try {
+			const path = "Team/Jane Doe/Overview.md";
+			await seedNote(
+				vault,
+				path,
+				buildNote(
+					{ type: "overview", person: "Jane Doe", generated_at: "2026-01-01", model: "old-model" },
+					"\nSTALE CONTENT\n",
+				),
+			);
+			enableAI();
+			const { provider } = fakeProvider("FRESH OVERVIEW");
+			await pickOverviewPerson("Jane Doe", optionsFor(provider));
+			modalOf(SendPreviewModal)!.confirmSend();
+			await flush();
+			await modalOf(OverviewDraftModal)!.writeOverview();
+			await flush();
+
+			const content = vault.getContent(path)!;
+			const { frontmatter, body } = splitFrontmatter(content);
+			expect(frontmatter.generated_at).toBe("2026-09-10");
+			expect(frontmatter.model).toBe("llama3");
+			expect(body).toContain("FRESH OVERVIEW");
+			expect(body).not.toContain("STALE CONTENT");
+			// Replaced in place — still exactly one Overview file for Jane.
+			expect(vault.getMarkdownFiles().map((file) => file.path)).toContain(path);
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
+	it("overview: AI failure notices and writes nothing", async () => {
+		enableAI();
+		const { provider } = fakeProvider(
+			new OllamaError(
+				"timeout",
+				"The Ollama server at http://localhost:11434 did not respond within 60000 ms.",
+			),
+		);
+		await pickOverviewPerson("Jane Doe", optionsFor(provider));
+		modalOf(SendPreviewModal)!.confirmSend();
+		await flush();
+
+		expect(hoisted.notices).toContain(
+			"The Ollama server at http://localhost:11434 did not respond within 60000 ms.",
+		);
+		expect(modalOf(OverviewDraftModal)).toBeUndefined();
+		expect(vault.getContent("Team/Jane Doe/Overview.md")).toBeUndefined();
+		// Core data untouched: the seeded files are all still there.
+		expect(vault.getMarkdownFiles()).toHaveLength(3);
+	});
+
+	it("overview: renders both modals' onOpen without a real DOM (stub smoke test)", async () => {
+		enableAI();
+		const { provider } = fakeProvider("OVERVIEW");
+		await pickOverviewPerson("Jane Doe", optionsFor(provider));
+		expect(() => modalOf(SendPreviewModal)!.onOpen()).not.toThrow();
+
+		modalOf(SendPreviewModal)!.confirmSend();
+		await flush();
+		const draft = modalOf(OverviewDraftModal)!;
+		expect(() => draft.onOpen()).not.toThrow();
+		expect(draft.draftText).toBe("OVERVIEW");
 	});
 });

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { buildNote, type Frontmatter } from "../frontmatter";
-import { personFolder } from "../paths";
+import { devPlanPath, personFolder } from "../paths";
 import { DEFAULT_SETTINGS, type TeamSyncSettings } from "../settings";
 import {
 	createMockVault,
@@ -65,8 +65,20 @@ async function addGoal(person: string, status: string): Promise<void> {
 	);
 }
 
+/** Dev plan at the person's configured path; last_reviewed optional. */
+async function addDevPlan(
+	person: string,
+	lastReviewed?: string,
+): Promise<void> {
+	const frontmatter: Frontmatter = { type: "dev-plan", person };
+	if (lastReviewed !== undefined) {
+		frontmatter.last_reviewed = lastReviewed;
+	}
+	await addNote(devPlanPath(settings, person), frontmatter);
+}
+
 function rows() {
-	return buildTeamRows(vault, cache, TODAY);
+	return buildTeamRows(vault, cache, TODAY, settings.devPlanReviewDays);
 }
 
 describe("buildTeamRows", () => {
@@ -85,6 +97,9 @@ describe("buildTeamRows", () => {
 				openGoals: 1,
 				openActionItems: 3,
 				overdue: true,
+				devPlanState: "no-plan",
+				devPlanLastReviewed: null,
+				devPlanDaysSinceReview: null,
 			},
 		]);
 	});
@@ -163,6 +178,9 @@ describe("buildTeamRows", () => {
 				openGoals: 0,
 				openActionItems: 0,
 				overdue: false, // never met — nothing to measure staleness against
+				devPlanState: "no-plan",
+				devPlanLastReviewed: null,
+				devPlanDaysSinceReview: null,
 			},
 		]);
 	});
@@ -186,6 +204,8 @@ describe("buildTeamRows", () => {
 
 		expect(rows().map((row) => row.name)).toEqual(["Jane Doe"]);
 		expect(rows()[0].openGoals).toBe(0);
+		// The typed dev-plan note IS consumed — 9 days old is fresh at 90.
+		expect(rows()[0].devPlanState).toBe("fresh");
 	});
 
 	it("sorts rows by person name and collapses duplicate index notes", async () => {
@@ -202,6 +222,77 @@ describe("buildTeamRows", () => {
 	});
 
 	it("returns [] for an empty vault", () => {
+		expect(rows()).toEqual([]);
+	});
+});
+
+describe("dev-plan freshness", () => {
+	it("treats the review threshold as >= 90 days (89 / 90 / 91 boundary)", async () => {
+		await addPerson("EightyNine");
+		await addPerson("Ninety");
+		await addPerson("NinetyOne");
+		await addDevPlan("EightyNine", "2026-06-13"); // 89 days before TODAY
+		await addDevPlan("Ninety", "2026-06-12"); // exactly 90
+		await addDevPlan("NinetyOne", "2026-06-11"); // 91
+		expect(settings.devPlanReviewDays).toBe(90);
+
+		const byName = new Map(rows().map((row) => [row.name, row]));
+		expect(byName.get("EightyNine")!.devPlanState).toBe("fresh");
+		expect(byName.get("Ninety")!.devPlanState).toBe("stale"); // boundary is stale
+		expect(byName.get("NinetyOne")!.devPlanState).toBe("stale");
+		expect(byName.get("Ninety")!.devPlanDaysSinceReview).toBe(90);
+		expect(byName.get("Ninety")!.devPlanLastReviewed).toBe("2026-06-12");
+	});
+
+	it("uses the threshold passed in, not a module constant", async () => {
+		await addPerson("Jane Doe");
+		await addDevPlan("Jane Doe", "2026-08-20"); // 21 days before TODAY
+
+		const [row] = buildTeamRows(vault, cache, TODAY, 21);
+		expect(row.devPlanState).toBe("stale");
+		expect(row.devPlanDaysSinceReview).toBe(21);
+
+		const [lenient] = buildTeamRows(vault, cache, TODAY, 90);
+		expect(lenient.devPlanState).toBe("fresh");
+	});
+
+	it("reports no-plan with nulls for a person without a dev plan", async () => {
+		await addPerson("Jane Doe");
+		const [row] = rows();
+		expect(row.devPlanState).toBe("no-plan");
+		expect(row.devPlanLastReviewed).toBeNull();
+		expect(row.devPlanDaysSinceReview).toBeNull();
+	});
+
+	it("treats a plan with a missing or non-ISO last_reviewed as never reviewed (stale)", async () => {
+		await addPerson("Missing");
+		await addPerson("Garbled");
+		await addDevPlan("Missing"); // field absent
+		await addNote("Team/Garbled/Development-Plan.md", {
+			type: "dev-plan",
+			person: "Garbled",
+			last_reviewed: "last Tuesday",
+		});
+
+		const byName = new Map(rows().map((row) => [row.name, row]));
+		for (const name of ["Missing", "Garbled"]) {
+			expect(byName.get(name)!.devPlanState).toBe("stale");
+			expect(byName.get(name)!.devPlanLastReviewed).toBeNull();
+			expect(byName.get(name)!.devPlanDaysSinceReview).toBeNull();
+		}
+	});
+
+	it("excludes the dev plans of archived people alongside their rows", async () => {
+		await addPerson("Jane Doe");
+		await addPerson("Bob Builder", "archived");
+		await addDevPlan("Bob Builder", "2020-01-01"); // would be very stale
+
+		const names = rows().map((row) => row.name);
+		expect(names).toEqual(["Jane Doe"]);
+	});
+
+	it("ignores a dev-plan note whose person has no index note", async () => {
+		await addDevPlan("Ghost", "2020-01-01");
 		expect(rows()).toEqual([]);
 	});
 });

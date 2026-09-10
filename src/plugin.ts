@@ -1,5 +1,6 @@
 import { Plugin } from "obsidian";
 import { registerAICommands } from "./commands/ai.commands";
+import { registerDevPlanCommands } from "./commands/dev-plan.commands";
 import { registerGoalCommands } from "./commands/goal.commands";
 import { registerOneOnOneCommands } from "./commands/one-on-one.commands";
 import { registerPersonCommands } from "./commands/person.commands";
@@ -17,6 +18,7 @@ export default class TeamSyncPlugin extends Plugin {
 		registerPersonCommands(this);
 		registerOneOnOneCommands(this);
 		registerGoalCommands(this);
+		registerDevPlanCommands(this);
 		registerAICommands(this);
 
 		this.registerView(

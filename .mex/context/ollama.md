@@ -45,8 +45,11 @@ Single shared model — the per-feature-model PRD question is still open; don't 
 
 ## Shipped vs Planned
 1. **Prep for 1:1 — SHIPPED (2026-09-10).** `assemblePrepContext()` gathers the last `prepContextNotes` 1:1 bodies (via OneOnOneService) + open goals (GoalService) + person profile; `buildPrepPrompt()` is pure and tested. Token budgeting: each note truncated to `MAX_NOTE_CHARS = 4000` (~1k tokens; 5 notes fits small context windows). Dev-plan context is a marked TODO seam until Phase 2. Flow: `SendPreviewModal` (exact content + destination indicator, explicit confirm) → `generate` → `PrepDraftModal` (editable draft, source citations, copy or insert-into-new-1:1 via the service). Not hooked into any core flow.
-2. **Summarize patterns** — Phase 4. themes/blockers/sentiment across a date range for one person or the team.
-3. **Draft assist** — Phase 4 (optional). rough notes → structured summary; free text → drafted action items.
+2. **Generate Overview — SHIPPED (2026-09-10).** `assembleOverviewContext()` gathers profile + last `prepContextNotes` 1:1 bodies + ALL goals with statuses + dev-plan body via an injectable `readFile` seam (DevPlanService exposes no body-read method yet — the seam stays until it gains one). Same budget as prep (`MAX_NOTE_CHARS`, no separate setting). Flow mirrors prep: model-empty gate → send preview (`SendPreviewModal` reused) → `OverviewDraftModal extends AIDraftModal` → explicit "Write Overview.md" button creates/replaces `<overviewFile>` (frontmatter `type: overview`, `person`, `generated_at`, `model`). User edits win over raw model output; never auto-written.
+3. **Summarize patterns** — Phase 4. themes/blockers/sentiment across a date range for one person or the team.
+4. **Draft assist** — Phase 4 (optional). rough notes → structured summary; free text → drafted action items.
+
+Modal layer: `AIDraftModal` (src/ai/prep-modal.ts) is the shared editable-draft base — title, textarea, source citations, copy + primary action with test seams; `PrepDraftModal` and `OverviewDraftModal` extend it.
 
 ## Transparency & Trust Rules
 - Before any send, show a preview of exactly what note content will be sent, with a clear UI indicator that an AI feature is about to transmit content to the model.

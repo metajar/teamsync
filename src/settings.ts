@@ -17,6 +17,10 @@ export interface TeamSyncSettings {
 	personIndexFile: string;
 	/** Development plan note filename inside a person folder. Default: 'Development-Plan.md'. */
 	devPlanFile: string;
+	/** Dev-plan review cadence in days; the dashboard flags plans not reviewed within this window. Default: 90. */
+	devPlanReviewDays: number;
+	/** Per-person AI-generated overview note filename. Default: 'Overview.md'. */
+	overviewFile: string;
 	/** Ollama server URL. Default: 'http://localhost:11434'. AI is optional — core features never need it. */
 	ollamaUrl: string;
 	/**
@@ -39,6 +43,8 @@ export const DEFAULT_SETTINGS: TeamSyncSettings = {
 	goalsFolder: "Goals",
 	personIndexFile: "_index.md",
 	devPlanFile: "Development-Plan.md",
+	devPlanReviewDays: 90,
+	overviewFile: "Overview.md",
 	ollamaUrl: "http://localhost:11434",
 	ollamaModel: "",
 	ollamaTemperature: 0.4,
@@ -122,6 +128,34 @@ export class TeamSyncSettingTab extends PluginSettingTab {
 					.setValue(this.plugin.settings.devPlanFile)
 					.onChange(async (value) => {
 						this.plugin.settings.devPlanFile = value;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Dev plan review cadence (days)")
+			.setDesc("The team dashboard flags a development plan not reviewed within this many days.")
+			.addText((text) =>
+				text
+					.setValue(String(this.plugin.settings.devPlanReviewDays))
+					.onChange(async (value) => {
+						const parsed = Number.parseInt(value, 10);
+						if (Number.isFinite(parsed) && parsed > 0) {
+							this.plugin.settings.devPlanReviewDays = parsed;
+							await this.plugin.saveSettings();
+						}
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Overview file")
+			.setDesc("Per-person AI-generated overview note filename (\"Generate Overview\" command).")
+			.addText((text) =>
+				text
+					.setPlaceholder("Overview.md")
+					.setValue(this.plugin.settings.overviewFile)
+					.onChange(async (value) => {
+						this.plugin.settings.overviewFile = value;
 						await this.plugin.saveSettings();
 					}),
 			);

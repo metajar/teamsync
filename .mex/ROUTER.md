@@ -37,8 +37,12 @@ Then read this file fully before doing anything else in this session.
 - Ollama integration (Phase 3, verified 2026-09-10 — build clean, 150/150 tests): `OllamaClient` is the sole AI boundary (requestUrl transport, `/api/tags` + `/api/generate` non-streaming, shared timeout/error wrapper with typed errors); Ollama settings section with Test-connection model dropdown + free-text fallback; "Prep 1:1 with AI" command with mandatory send-preview modal and editable-draft result with citations (see `context/ollama.md`)
 - Contracts for the above pinned in `src/CONTRACTS.md`
 
+- Dev plans (Phase 2, verified 2026-09-10): DevPlanService (create/get/markReviewed — byte-for-byte frontmatter rewrite + revision-log append), "Create development plan" / "Mark dev plan reviewed" commands, dashboard Dev-plan freshness column (`devPlanReviewDays`, default 90; exactly-at-threshold = stale)
+- Generate Overview (AI): "Generate Overview" command creates/replaces `Overview.md` per person from 1:1s + goals + dev plan via Ollama; send-preview + editable draft + explicit write button (never auto-written); `AIDraftModal` shared base for AI draft modals
+- Contracts for the above pinned in `src/CONTRACTS.md`
+
 **Not yet built:**
-- Phase 2: development plans + review reminders, person dashboard, OKR-style sub-items, custom templates (a TODO seam for dev-plan context exists in `src/ai/prep-context.ts`)
+- Phase 2 remainder: person dashboard view (Overview.md serves the summary role for now), OKR-style goal sub-items, custom templates
 - Phase 4: pattern/theme summarization, draft assist, mobile (stretch)
 
 **Known issues:**

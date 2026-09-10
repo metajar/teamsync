@@ -42,18 +42,24 @@ Everything lives under a `Team/` folder in your vault (configurable in **Setting
 | **TeamSync: New goal** | Creates a goal note linked to a person, with status and optional target date |
 | **TeamSync: Update goal status** | Moves a goal between `not-started` / `in-progress` / `blocked` / `done` |
 | **TeamSync: Archive team member** | Marks a person archived — all their history is preserved, never deleted |
-| **TeamSync: Open team dashboard** | One row per person: last 1:1 date, days since, open goals, open action items, and an overdue badge after 21 days |
+| **TeamSync: Create development plan** | Scaffolds a per-person `Development-Plan.md` — growth areas, skills, target role, stretch opportunities, revision log |
+| **TeamSync: Mark dev plan reviewed** | Stamps the plan's review date and adds a revision-log entry |
+| **TeamSync: Open team dashboard** | One row per person: last 1:1 date, days since, open goals, open action items, overdue badge after 21 days, and dev-plan freshness |
 | **TeamSync: Prep 1:1 with AI** | Assembles your recent 1:1 notes and open goals into a prep brief via your local Ollama server — see below |
+| **TeamSync: Generate Overview** | Creates or replaces a per-person `Overview.md` — an AI-written person summary built from their 1:1s, goals, and dev plan — see below |
 
 The ribbon icon (two people) also opens the team dashboard.
 
 ## Optional: local AI (Ollama)
 
-The plugin can call a locally-running [Ollama](https://ollama.com) server to draft a 1:1 prep brief (suggested talking points, open action items, past concerns, goal check-ins).
+The plugin can call a locally-running [Ollama](https://ollama.com) server for two features:
+
+- **Prep 1:1 with AI** — a 1:1 prep brief (suggested talking points, open action items, past concerns, goal check-ins).
+- **Generate Overview** — a per-person `Overview.md` summarizing role and context, goals with statuses, recurring themes, wins, and suggested focus areas, built from their 1:1s, goals, and dev plan. Regenerating replaces the note.
 
 1. Install and start Ollama, with at least one model pulled (e.g. `ollama pull llama3`).
 2. In **Settings → TeamSync → Ollama**, set the server URL (default `http://localhost:11434`), click **Test connection**, and pick a model from the dropdown.
-3. Run **TeamSync: Prep 1:1 with AI**, pick a person, review the preview, and send.
+3. Run **TeamSync: Prep 1:1 with AI** or **TeamSync: Generate Overview**, pick a person, review the preview, and send.
 
 How it respects your privacy:
 
@@ -72,7 +78,8 @@ Team/
       2026-09-09.md      one note per 1:1
     Goals/
       2026-q3-...md      one note per goal
-    Development-Plan.md  (coming in a future release)
+    Development-Plan.md  evolving dev plan with revision log
+    Overview.md          AI-generated person overview (optional)
 ```
 
 Structured data lives only in YAML frontmatter, so notes stay compatible with Dataview and fully greppable.

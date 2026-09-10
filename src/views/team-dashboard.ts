@@ -59,7 +59,12 @@ export class TeamDashboardView extends ItemView {
 		let rows: TeamRow[];
 		try {
 			// Passes the vault/cache as references; the model does the reading.
-			rows = buildTeamRows(this.app.vault, this.app.metadataCache, todayISO());
+			rows = buildTeamRows(
+				this.app.vault,
+				this.app.metadataCache,
+				todayISO(),
+				this.plugin.settings.devPlanReviewDays,
+			);
 		} catch (error) {
 			const detail = error instanceof Error ? error.message : String(error);
 			root.createEl("p", {
@@ -84,6 +89,7 @@ export class TeamDashboardView extends ItemView {
 			"Days since",
 			"Open goals",
 			"Open action items",
+			"Dev plan",
 		]) {
 			head.createEl("th", { text: label });
 		}
@@ -120,6 +126,23 @@ export class TeamDashboardView extends ItemView {
 			tr.createEl("td", {
 				text: row.openActionItems === 0 ? "—" : String(row.openActionItems),
 			});
+
+			const devPlanCell = tr.createEl("td");
+			if (row.devPlanState === "no-plan") {
+				devPlanCell.setText("—");
+			} else {
+				devPlanCell.setText(row.devPlanLastReviewed ?? "—");
+				// Passive stale badge only — notifications are an open PRD question.
+				if (row.devPlanState === "stale") {
+					devPlanCell.createEl("span", {
+						text:
+							row.devPlanLastReviewed === null
+								? "never reviewed"
+								: `not reviewed in ${this.plugin.settings.devPlanReviewDays}+ days`,
+						cls: "teamsync-dashboard-badge",
+					});
+				}
+			}
 		}
 	}
 }
