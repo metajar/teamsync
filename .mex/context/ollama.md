@@ -33,22 +33,24 @@ All AI features call a user-configured Ollama server and nothing else. This is t
 
 ## Settings (Obsidian plugin settings, not env vars)
 - `ollamaUrl` — server URL, default `http://localhost:11434`
-- `model` — dropdown populated from the server's `/api/tags`
-- temperature / context-size settings
-[TO BE DETERMINED — PRD open question: single shared model vs per-feature model selection (e.g. smaller/faster for prep briefs, larger for pattern synthesis). Default to a single shared model until decided.]
+- `ollamaModel` — default `''` (empty = AI disabled); dropdown populated from the server's `/api/tags` via the settings tab's "Test connection" button; free-text fallback when the server is unreachable or lists nothing
+- `ollamaTemperature` — default 0.4
+- `ollamaTimeoutMs` — default 60000
+- `prepContextNotes` — how many past 1:1 notes feed the prep brief, default 5
+Single shared model — the per-feature-model PRD question is still open; don't build per-feature plumbing until decided.
 
 ## Endpoints
 - `GET /api/tags` — list installed models (populates the model dropdown)
-- `/api/generate` or `/api/chat` — generation. [VERIFY AFTER FIRST IMPLEMENTATION — pick one; `/api/chat` if we want structured multi-turn, `/api/generate` for one-shot with a formatted prompt]
+- `POST /api/generate` — generation. **Decided 2026-09-10:** `/api/generate` non-streaming (`stream: false`, read `data.response`) over `/api/chat` — our prompts are one-shot and formatted, no multi-turn structure. Transport: Obsidian's `requestUrl` (bypasses renderer CORS to localhost:11434; `fetch` would need server-side CORS config). Timeout enforced in the client's shared wrapper via `Promise.race` — `requestUrl` has no abort support.
 
-## Planned Features (Phase 3–4)
-1. **Prep for 1:1** — send last N 1:1 notes + open goals + dev plan as context; get back a structured brief: talking points, open action items, follow-ups on past concerns, goal check-in prompts.
-2. **Summarize patterns** — themes/blockers/sentiment across a date range for one person or the team.
-3. **Draft assist** (optional) — rough notes → structured summary; free text → drafted action items.
+## Shipped vs Planned
+1. **Prep for 1:1 — SHIPPED (2026-09-10).** `assemblePrepContext()` gathers the last `prepContextNotes` 1:1 bodies (via OneOnOneService) + open goals (GoalService) + person profile; `buildPrepPrompt()` is pure and tested. Token budgeting: each note truncated to `MAX_NOTE_CHARS = 4000` (~1k tokens; 5 notes fits small context windows). Dev-plan context is a marked TODO seam until Phase 2. Flow: `SendPreviewModal` (exact content + destination indicator, explicit confirm) → `generate` → `PrepDraftModal` (editable draft, source citations, copy or insert-into-new-1:1 via the service). Not hooked into any core flow.
+2. **Summarize patterns** — Phase 4. themes/blockers/sentiment across a date range for one person or the team.
+3. **Draft assist** — Phase 4 (optional). rough notes → structured summary; free text → drafted action items.
 
 ## Transparency & Trust Rules
 - Before any send, show a preview of exactly what note content will be sent, with a clear UI indicator that an AI feature is about to transmit content to the model.
 - AI output is a draft, not a source of truth — frame it as such in the UI and always cite which notes it drew from.
 
 ## Context Assembly
-Prep-brief context is gathered via the service layer (OneOnOneService, GoalService, DevPlanService) — OllamaClient never reads the vault itself. [VERIFY AFTER FIRST IMPLEMENTATION — token budgeting: how many notes/what truncation fits the model's context window]
+Prep-brief context is gathered via the service layer (OneOnOneService, GoalService, DevPlanService) — OllamaClient never reads the vault itself. Token budgeting: `MAX_NOTE_CHARS = 4000` per note, `prepContextNotes` (default 5) notes total — truncate rather than raising the timeout when briefs degrade.

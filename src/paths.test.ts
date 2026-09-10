@@ -10,6 +10,7 @@ import {
 import { DEFAULT_SETTINGS, type TeamSyncSettings } from "./settings";
 
 const custom: TeamSyncSettings = {
+	...DEFAULT_SETTINGS,
 	rootFolder: "People/",
 	oneOnOnesFolder: "One-on-Ones",
 	goalsFolder: "/Objectives/",

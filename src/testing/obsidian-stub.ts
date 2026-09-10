@@ -71,8 +71,68 @@ export class Notice {
 	}
 }
 
+/**
+ * DOM-less element stand-in, just enough for Modal.onOpen() implementations
+ * to run (and be smoke-tested) in the node test environment: text setting,
+ * child creation (createEl/createDiv, with DomElementInfo-style `{ text }`),
+ * textarea `value`, and no-op listeners.
+ */
+export class StubEl {
+	value = "";
+	/** Stand-in for CSSStyleDeclaration — assignments are silently kept. */
+	style: Record<string, string> = {};
+	/** Element tag when created via createEl/createDiv — for assertions. */
+	readonly tag: string;
+
+	constructor(tag = "div") {
+		this.tag = tag;
+	}
+
+	setText(text: string): this {
+		(this as { text?: string }).text = text;
+		return this;
+	}
+
+	getText(): string {
+		return (this as { text?: string }).text ?? "";
+	}
+
+	empty(): this {
+		return this;
+	}
+
+	createDiv(
+		options?: unknown | ((el: StubEl) => void),
+		callback?: (el: StubEl) => void,
+	): StubEl {
+		return this.createEl("div", options, callback);
+	}
+
+	createEl(
+		tag: string,
+		options?: unknown | ((el: StubEl) => void),
+		callback?: (el: StubEl) => void,
+	): StubEl {
+		const el = new StubEl(tag);
+		if (options !== null && options !== undefined && typeof options === "object" && "text" in options) {
+			el.setText(String((options as { text?: unknown }).text ?? ""));
+		}
+		const configure = typeof options === "function" ? options : callback;
+		configure?.(el);
+		return el;
+	}
+
+	addEventListener(_type: string, _listener: () => void): void {}
+
+	appendChild(_child: unknown): void {}
+}
+
 export class Modal {
 	app: unknown;
+	/** Minimal stand-ins for the real Modal's container elements. */
+	titleEl: StubEl = new StubEl("h2");
+	contentEl: StubEl = new StubEl("div");
+	modalEl: StubEl = new StubEl("div");
 	constructor(app?: unknown) {
 		this.app = app;
 	}

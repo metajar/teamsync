@@ -143,6 +143,28 @@ export class OneOnOneService {
 	}
 
 	/**
+	 * Full body (frontmatter stripped) of a listed 1:1 note — the sanctioned
+	 * read path for AI prep context, so callers never touch `vault.read`.
+	 */
+	async readOneOnOneBody(note: OneOnOneNote): Promise<string> {
+		return splitFrontmatter(await this.vault.read(note.file)).body;
+	}
+
+	/**
+	 * Append text to the end of a 1:1 note's body, preserving its frontmatter
+	 * and existing body verbatim. Used by the AI draft "insert" action after
+	 * the user has reviewed and edited the draft — never called unattended.
+	 */
+	async appendToOneOnOne(file: TFile, addition: string): Promise<void> {
+		const { frontmatter, body } = splitFrontmatter(await this.vault.read(file));
+		const separator = body.endsWith("\n") || body === "" ? "" : "\n";
+		await this.vault.modify(
+			file,
+			buildNote(frontmatter, `${body}${separator}${addition.trim()}\n`),
+		);
+	}
+
+	/**
 	 * Names of people under the root folder with a person `_index.md` that is
 	 * not archived. Shared-shape helper so the command's suggest modal stays
 	 * free of vault access; the integrator may consolidate with

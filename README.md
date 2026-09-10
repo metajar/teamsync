@@ -1,6 +1,6 @@
 # TeamSync
 
-An Obsidian plugin that helps engineering managers run one-on-ones, track goals, and manage development plans for their direct reports — all inside your existing vault, as plain markdown. Optional local-AI assistance via Ollama is planned but not yet included; the current release is fully offline.
+An Obsidian plugin that helps engineering managers run one-on-ones, track goals, and manage development plans for their direct reports — all inside your existing vault, as plain markdown. Includes optional local-AI assistance via [Ollama](https://ollama.com) for 1:1 prep briefs — fully offline if you don't use it.
 
 Your data stays plain markdown + YAML frontmatter. The vault remains fully readable and usable without the plugin.
 
@@ -43,8 +43,24 @@ Everything lives under a `Team/` folder in your vault (configurable in **Setting
 | **TeamSync: Update goal status** | Moves a goal between `not-started` / `in-progress` / `blocked` / `done` |
 | **TeamSync: Archive team member** | Marks a person archived — all their history is preserved, never deleted |
 | **TeamSync: Open team dashboard** | One row per person: last 1:1 date, days since, open goals, open action items, and an overdue badge after 21 days |
+| **TeamSync: Prep 1:1 with AI** | Assembles your recent 1:1 notes and open goals into a prep brief via your local Ollama server — see below |
 
 The ribbon icon (two people) also opens the team dashboard.
+
+## Optional: local AI (Ollama)
+
+The plugin can call a locally-running [Ollama](https://ollama.com) server to draft a 1:1 prep brief (suggested talking points, open action items, past concerns, goal check-ins).
+
+1. Install and start Ollama, with at least one model pulled (e.g. `ollama pull llama3`).
+2. In **Settings → TeamSync → Ollama**, set the server URL (default `http://localhost:11434`), click **Test connection**, and pick a model from the dropdown.
+3. Run **TeamSync: Prep 1:1 with AI**, pick a person, review the preview, and send.
+
+How it respects your privacy:
+
+- The **only** network destination is the Ollama URL you configure. No cloud APIs, no telemetry — on error paths too.
+- Before anything is sent, a **preview shows the exact note content** about to be transmitted, and nothing goes out until you confirm.
+- AI output appears as an **editable draft** with the notes it drew from cited — a starting point, never auto-written into your vault.
+- Every core feature works with Ollama disabled, unreachable, or never configured.
 
 ### Data layout
 
@@ -63,8 +79,8 @@ Structured data lives only in YAML frontmatter, so notes stay compatible with Da
 
 ## Privacy
 
-- No network calls, no telemetry, no analytics. Core features work fully offline.
-- Future AI features will call only a locally-configured Ollama endpoint, with a preview of any content before it is sent.
+- No telemetry, no analytics, no cloud APIs. Core features work fully offline.
+- The only network the plugin can ever make is to your locally-configured Ollama endpoint — always preceded by a content preview you confirm (see [Optional: local AI](#optional-local-ai-ollama)).
 - 1:1 and performance notes are sensitive: keep the vault encrypted at rest and avoid syncing it to cloud accounts you don't control.
 
 ## Development

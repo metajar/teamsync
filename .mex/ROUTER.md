@@ -34,11 +34,12 @@ Then read this file fully before doing anything else in this session.
 - 1:1 logging: OneOnOneService — dated notes from template, same-day suffix collision handling, carry-forward via exported pure checkbox parser `extractOpenActionItems()`
 - Goals: GoalService — create/list/get, four-state status machine, byte-for-byte-safe `updateStatus`, `openGoalCount`
 - Team dashboard: ItemView fed by a pure model (`team-dashboard-model.ts`) — last 1:1 date, days since, open goals, open action items, passive 21-day overdue badge; metadata-cache reads only, no body loads
-- Contracts for all of the above pinned in `src/CONTRACTS.md`
+- Ollama integration (Phase 3, verified 2026-09-10 — build clean, 150/150 tests): `OllamaClient` is the sole AI boundary (requestUrl transport, `/api/tags` + `/api/generate` non-streaming, shared timeout/error wrapper with typed errors); Ollama settings section with Test-connection model dropdown + free-text fallback; "Prep 1:1 with AI" command with mandatory send-preview modal and editable-draft result with citations (see `context/ollama.md`)
+- Contracts for the above pinned in `src/CONTRACTS.md`
 
 **Not yet built:**
-- Phase 2: development plans + review reminders, person dashboard, OKR-style sub-items, custom templates
-- Phase 3–4: Ollama integration (settings, prep briefs, transparency UI), pattern summarization, draft assist, mobile (stretch)
+- Phase 2: development plans + review reminders, person dashboard, OKR-style sub-items, custom templates (a TODO seam for dev-plan context exists in `src/ai/prep-context.ts`)
+- Phase 4: pattern/theme summarization, draft assist, mobile (stretch)
 
 **Known issues:**
 - Stale services: `one-on-one.commands.ts` and `goal.commands.ts` construct their services once at registration; a settings change mid-session leaves them stale (person.commands.ts correctly builds per invocation)
@@ -46,7 +47,9 @@ Then read this file fully before doing anything else in this session.
 - Carry-forward heading `### Carried forward from <date>` is a literal in `one-on-one.service.ts`, not a template slot — accepted as generated dynamic content
 - Overdue threshold hardcoded at 21 days (`OVERDUE_THRESHOLD_DAYS` exported, not yet a setting)
 - No lint setup (`npm run lint` does not exist)
-- Open questions from PRD §10: mood/pulse capture format (currently an empty-string frontmatter slot), shared vs per-feature Ollama model, person-summary export, passive vs active reminders, visibility toggles
+- AI is disabled by default (`ollamaModel: ''`) — the prep command exits with a setup hint until a model is configured
+- A goal note with corrupted status frontmatter surfaces as a Notice in the prep flow rather than being skipped (GoalService's loud-corruption contract)
+- Open questions from PRD §10: mood/pulse capture format (currently an empty-string frontmatter slot), shared vs per-feature Ollama model (single shared model shipped), person-summary export, passive vs active reminders, visibility toggles
 
 ## Routing Table
 
