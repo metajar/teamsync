@@ -1,0 +1,33 @@
+/* TeamSync styles — placeholder. Feature agents add styles here as views land. */
+
+/* Team dashboard (src/views/team-dashboard.ts) */
+.teamsync-dashboard {
+	width: 100%;
+	border-collapse: collapse;
+}
+.teamsync-dashboard th,
+.teamsync-dashboard td {
+	text-align: left;
+	padding: 6px 10px;
+	border-bottom: 1px solid var(--background-modifier-border);
+}
+.teamsync-dashboard tbody tr {
+	cursor: pointer;
+}
+.teamsync-dashboard tbody tr:hover {
+	background: var(--background-modifier-hover);
+}
+.teamsync-dashboard-badge {
+	display: inline-block;
+	margin-left: 6px;
+	padding: 1px 6px;
+	border-radius: 4px;
+	font-size: var(--font-ui-smaller);
+	background: var(--background-modifier-error);
+	color: var(--text-on-accent);
+	white-space: nowrap;
+}
+.teamsync-dashboard-error {
+	color: var(--text-error);
+}
+

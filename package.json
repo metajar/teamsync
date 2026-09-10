@@ -1,0 +1,30 @@
+{
+	"name": "teamsync",
+	"version": "0.1.0",
+	"description": "One-on-ones, goals, and development plans for your direct reports — inside Obsidian, with optional local AI via Ollama.",
+	"main": "main.js",
+	"scripts": {
+		"dev": "node esbuild.config.mjs",
+		"build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
+		"test": "vitest run"
+	},
+	"keywords": [
+		"obsidian",
+		"plugin",
+		"management",
+		"one-on-ones"
+	],
+	"author": "Jared Henry",
+	"license": "MIT",
+	"devDependencies": {
+		"@types/node": "^22.0.0",
+		"builtin-modules": "^4.0.0",
+		"esbuild": "^0.25.0",
+		"tslib": "^2.8.0",
+		"typescript": "^5.6.0",
+		"vitest": "^3.0.0"
+	},
+	"dependencies": {
+		"obsidian": "^1.4.0"
+	}
+}

@@ -1,0 +1,9 @@
+{
+  "scaffold_id": "51a12e97-1627-4002-92d6-3fcb14418c35",
+  "scaffold_name": "obsidian-sdm",
+  "origin": null,
+  "upstream": null,
+  "aiTools": [
+    "claude"
+  ]
+}
