@@ -12,6 +12,7 @@ export interface TeamSyncSettings {
   oneOnOnesFolder: string;   // default "1-on-1s"
   goalsFolder: string;       // default "Goals"
   personIndexFile: string;   // default "_index.md"
+  topicsFile: string;        // default "topics.md"
   devPlanFile: string;       // default "Development-Plan.md"
 }
 export const DEFAULT_SETTINGS: TeamSyncSettings;
@@ -42,6 +43,7 @@ export function personFolder(settings: TeamSyncSettings, personName: string): st
 export function oneOnOneFolder(settings: TeamSyncSettings, personName: string): string; // Team/Jane Doe/1-on-1s
 export function goalsFolder(settings: TeamSyncSettings, personName: string): string;    // Team/Jane Doe/Goals
 export function personIndexPath(settings: TeamSyncSettings, personName: string): string;// Team/Jane Doe/_index.md
+export function topicsPath(settings: TeamSyncSettings, personName: string): string;    // Team/Jane Doe/topics.md
 export function devPlanPath(settings: TeamSyncSettings, personName: string): string;    // Team/Jane Doe/Development-Plan.md
 ```
 
@@ -112,6 +114,30 @@ export function registerPersonCommands(plugin: TeamSyncPlugin): void;
 - **Never call `vault.*` or read the metadata cache directly** from a command.
   If a rollup is needed, expose it as a service method.
 - Command ids: kebab-case with a `teamsync-` prefix (e.g. `teamsync-new-one-on-one`).
+
+## TopicService — `src/topic.service.ts`
+
+The per-person running list of discussion topics queued for the next 1:1
+(`topics.md`, `type: topics`). The bullet list in the body IS the structured
+data — one of the two sanctioned body reads (see `.mex/context/data-model.md`).
+
+```typescript
+export function extractTopics(body: string): string[];   // pure parser: top-level plain bullets
+export function renderDiscussionTopics(topics: string[]): string; // "### Discussion topics" + unchecked boxes
+export class TopicService {
+  constructor(vault: Vault, settings: TeamSyncSettings);
+  addTopic(personName: string, topic: string): Promise<string[]>; // updated queue; creates note if missing
+  listTopics(personName: string): Promise<string[]>;              // [] when the note is missing
+  clearTopics(personName: string): Promise<void>;                 // body → fresh template, frontmatter preserved
+  ensureTopicsFile(personName: string): Promise<TFile>;           // create-if-missing, for opening
+}
+```
+
+Drain rule: **OneOnOneService.createOneOnOne(person, date?, discussionTopics?)**
+injects topics into the agenda; the command layer drains (clearTopics) only
+after the note is successfully created, so a failed create never loses the
+queue. Checkbox lines in `topics.md` (`- [ ]`/`- [x]`) are deliberately not
+topics — a struck topic stays in the file without being re-queued.
 
 ## Test harness — `src/testing/`
 

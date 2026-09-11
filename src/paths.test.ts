@@ -6,6 +6,7 @@ import {
 	oneOnOneFolder,
 	personFolder,
 	personIndexPath,
+	topicsPath,
 } from "./paths";
 import { DEFAULT_SETTINGS, type TeamSyncSettings } from "./settings";
 
@@ -16,6 +17,7 @@ const custom: TeamSyncSettings = {
 	goalsFolder: "/Objectives/",
 	personIndexFile: "profile.md",
 	devPlanFile: "Dev-Plan.md",
+	topicsFile: "Discussion-Topics.md",
 };
 
 describe("path derivation (default settings)", () => {
@@ -40,6 +42,10 @@ describe("path derivation (default settings)", () => {
 	it("derives the dev plan path", () => {
 		expect(devPlanPath(s, "Jane Doe")).toBe("Team/Jane Doe/Development-Plan.md");
 	});
+
+	it("derives the topics path", () => {
+		expect(topicsPath(s, "Jane Doe")).toBe("Team/Jane Doe/topics.md");
+	});
 });
 
 describe("path derivation (custom settings)", () => {
@@ -48,6 +54,9 @@ describe("path derivation (custom settings)", () => {
 		expect(goalsFolder(custom, "Jane Doe")).toBe("People/Jane Doe/Objectives");
 		expect(personIndexPath(custom, "Jane Doe")).toBe("People/Jane Doe/profile.md");
 		expect(devPlanPath(custom, "Jane Doe")).toBe("People/Jane Doe/Dev-Plan.md");
+		expect(topicsPath(custom, "Jane Doe")).toBe(
+			"People/Jane Doe/Discussion-Topics.md",
+		);
 	});
 });
 

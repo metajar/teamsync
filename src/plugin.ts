@@ -4,6 +4,7 @@ import { registerDevPlanCommands } from "./commands/dev-plan.commands";
 import { registerGoalCommands } from "./commands/goal.commands";
 import { registerOneOnOneCommands } from "./commands/one-on-one.commands";
 import { registerPersonCommands } from "./commands/person.commands";
+import { registerTopicCommands } from "./commands/topic.commands";
 import { DEFAULT_SETTINGS, TeamSyncSettingTab } from "./settings";
 import type { TeamSyncSettings } from "./settings";
 import { TeamDashboardView, VIEW_TYPE_TEAM_DASHBOARD } from "./views/team-dashboard";
@@ -17,6 +18,7 @@ export default class TeamSyncPlugin extends Plugin {
 
 		registerPersonCommands(this);
 		registerOneOnOneCommands(this);
+		registerTopicCommands(this);
 		registerGoalCommands(this);
 		registerDevPlanCommands(this);
 		registerAICommands(this);

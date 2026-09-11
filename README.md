@@ -37,8 +37,10 @@ Everything lives under a `Team/` folder in your vault (configurable in **Setting
 
 | Command (Ctrl/Cmd+P) | What it does |
 |---|---|
-| **TeamSync: Add team member** | Scaffolds `Team/<Name>/` with an `_index.md` profile, `1-on-1s/` and `Goals/` folders |
-| **TeamSync: New 1:1 note** | Creates a dated 1:1 note from the template; unresolved action items from the last 1:1 are carried forward into the agenda |
+| **TeamSync: Add team member** | Scaffolds `Team/<Name>/` with an `_index.md` profile, `1-on-1s/` and `Goals/` folders, and a `topics.md` discussion list |
+| **TeamSync: New 1:1 note** | Creates a dated 1:1 note from the template; unresolved action items from the last 1:1 are carried forward into the agenda, and any queued discussion topics are moved in (see below) |
+| **TeamSync: Add topic for discussion** | Picks a person, then appends your text to their running `topics.md` list — anything you want to raise at their next 1:1 |
+| **TeamSync: Open discussion topics list** | Opens a person's `topics.md` (created if missing) — edit it by hand any time |
 | **TeamSync: New goal** | Creates a goal note linked to a person, with status and optional target date |
 | **TeamSync: Update goal status** | Moves a goal between `not-started` / `in-progress` / `blocked` / `done` |
 | **TeamSync: Archive team member** | Marks a person archived — all their history is preserved, never deleted |
@@ -49,6 +51,10 @@ Everything lives under a `Team/` folder in your vault (configurable in **Setting
 | **TeamSync: Generate Overview** | Creates or replaces a per-person `Overview.md` — an AI-written person summary built from their 1:1s, goals, and dev plan — see below |
 
 The ribbon icon (two people) also opens the team dashboard.
+
+### Running discussion-topics list
+
+Whenever something comes up between 1:1s — a win to celebrate, a concern, a question — run **Add topic for discussion**, pick the person, and type it. Topics queue up in that person's `topics.md` as a plain bullet list (edit the file directly any time via **Open discussion topics list**). The next time you run **New 1:1 note** for that person, every queued topic is moved into the note's agenda under **Discussion topics** and the running list is emptied. Topics are unchecked boxes in the note, so anything you don't tick off during the meeting automatically carries forward to the following 1:1.
 
 ## Optional: local AI (Ollama)
 
@@ -78,6 +84,7 @@ Team/
       2026-09-09.md      one note per 1:1
     Goals/
       2026-q3-...md      one note per goal
+    topics.md            running list of discussion topics for the next 1:1
     Development-Plan.md  evolving dev plan with revision log
     Overview.md          AI-generated person overview (optional)
 ```

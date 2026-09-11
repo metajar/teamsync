@@ -5,6 +5,7 @@ import { buildNote, splitFrontmatter } from "./frontmatter";
 import { joinPath, oneOnOneFolder, personIndexPath } from "./paths";
 import { renderTemplate } from "./template-engine";
 import { ONE_ON_ONE_TEMPLATE } from "./templates/one-on-one";
+import { renderDiscussionTopics } from "./topic.service";
 
 /**
  * OneOnOneService — creation, listing, and carry-forward for 1:1 notes.
@@ -78,11 +79,18 @@ export class OneOnOneService {
 
 	/**
 	 * Create today's (or `date`'s) 1:1 note for a person, carrying forward any
-	 * open action items from their most recent existing note. Same-day
-	 * collisions get a `-2`, `-3`, … filename suffix — existing notes are
-	 * never overwritten. Returns the created file so the caller can open it.
+	 * open action items from their most recent existing note and injecting the
+	 * given discussion topics (typically drained from the person's running
+	 * topics list — the caller owns that drain so a failed create never loses
+	 * the queue; see the command wiring). Same-day collisions get a `-2`,
+	 * `-3`, … filename suffix — existing notes are never overwritten. Returns
+	 * the created file so the caller can open it.
 	 */
-	async createOneOnOne(personName: string, date?: string): Promise<TFile> {
+	async createOneOnOne(
+		personName: string,
+		date?: string,
+		discussionTopics: string[] = [],
+	): Promise<TFile> {
 		const noteDate = date ?? todayISO();
 		const folder = oneOnOneFolder(this.settings, personName);
 		await this.vault.adapter.mkdir(folder);
@@ -102,6 +110,7 @@ export class OneOnOneService {
 		const body = renderTemplate(ONE_ON_ONE_TEMPLATE, {
 			person: personName,
 			date: noteDate,
+			discussion_topics: renderDiscussionTopics(discussionTopics),
 			carried_forward: carriedBlock,
 		});
 		const content = buildNote(

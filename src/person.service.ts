@@ -7,10 +7,12 @@ import {
 	oneOnOneFolder,
 	personFolder,
 	personIndexPath,
+	topicsPath,
 } from "./paths";
 import type { TeamSyncSettings } from "./settings";
 import { renderTemplate } from "./template-engine";
 import { PERSON_TEMPLATE } from "./templates/person";
+import { TOPICS_TEMPLATE } from "./templates/topics";
 
 export type PersonStatus = "active" | "archived";
 
@@ -45,8 +47,9 @@ export class PersonService {
 
 	/**
 	 * Quick-add a team member: scaffold the person folder with its 1:1 and
-	 * Goals subfolders and write the index note from the template.
-	 * Throws on an empty name, a name containing "/", or a duplicate.
+	 * Goals subfolders, the running discussion-topics note, and the index
+	 * note from the template. Throws on an empty name, a name containing
+	 * "/", or a duplicate.
 	 */
 	async createPerson(
 		rawName: string,
@@ -66,10 +69,21 @@ export class PersonService {
 			);
 		}
 
-		// createFolder builds ancestors, so these two calls also create the
+		// createFolder builds ancestors, so these calls also create the
 		// person folder (and the root folder on the very first person).
 		await this.vault.createFolder(oneOnOneFolder(this.settings, name));
 		await this.vault.createFolder(goalsFolder(this.settings, name));
+
+		// Running list of discussion topics queued for the next 1:1 — created
+		// empty so the file is there to hand-edit from day one; lazily
+		// recreated by TopicService for pre-existing people.
+		await this.vault.create(
+			topicsPath(this.settings, name),
+			buildNote(
+				{ type: "topics", person: name },
+				`\n${renderTemplate(TOPICS_TEMPLATE, { person: name })}`,
+			),
+		);
 
 		const frontmatter: Frontmatter = {
 			type: "person",
@@ -88,6 +102,7 @@ export class PersonService {
 			one_on_ones_link: oneOnOneFolder(this.settings, name),
 			goals_link: goalsFolder(this.settings, name),
 			dev_plan_link: devPlanPath(this.settings, name),
+			topics_link: topicsPath(this.settings, name),
 		});
 
 		await this.vault.create(indexPath, buildNote(frontmatter, `\n${body}`));

@@ -10,6 +10,7 @@
  *   one_on_ones_link  vault path of the person's 1:1 folder
  *   goals_link        vault path of the person's Goals folder
  *   dev_plan_link     vault path of the person's development plan note
+ *   topics_link       vault path of the person's running discussion-topics note
  */
 export const PERSON_TEMPLATE = `# {{name}}
 
@@ -21,6 +22,7 @@ export const PERSON_TEMPLATE = `# {{name}}
 ## Quick links
 
 - [[{{one_on_ones_link}}|1:1 notes]]
+- [[{{topics_link}}|Discussion topics]]
 - [[{{goals_link}}|Goals]]
 - [[{{dev_plan_link}}|Development plan]]
 

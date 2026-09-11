@@ -67,7 +67,13 @@ export class PluginSettingTab {
 export class Notice {
 	message: string | DocumentFragment;
 	constructor(message: string | DocumentFragment, _timeout?: number) {
-		this.message = message instanceof DocumentFragment ? message : String(message);
+		// The node test environment has no DOM, so DocumentFragment is absent —
+		// every message here is (or becomes) a plain string.
+		this.message =
+			typeof DocumentFragment !== "undefined" &&
+			message instanceof DocumentFragment
+				? message
+				: String(message);
 	}
 }
 

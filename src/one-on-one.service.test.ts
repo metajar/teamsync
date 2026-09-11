@@ -120,6 +120,7 @@ describe("ONE_ON_ONE_TEMPLATE", () => {
 			date: "2026-09-10",
 		});
 		expect(rendered).not.toContain("Carried forward");
+		expect(rendered).not.toContain("Discussion topics");
 		expect(rendered).not.toContain("{{");
 	});
 });
@@ -249,6 +250,45 @@ describe("OneOnOneService.createOneOnOne", () => {
 		await service.createOneOnOne("Jane Doe", "2026-09-10");
 
 		expect(vault.getContent(priorPath)).toBe(prior);
+	});
+
+	it("injects queued discussion topics into the agenda as unchecked boxes", async () => {
+		await service.createOneOnOne("Jane Doe", "2026-09-10", [
+			"Talk about growth",
+			"Cover the incident review",
+		]);
+
+		const { body } = splitFrontmatter(
+			vault.getContent("Team/Jane Doe/1-on-1s/2026-09-10.md")!,
+		);
+		const agenda = body.slice(
+			body.indexOf("## Agenda / Talking Points"),
+			body.indexOf("## Notes"),
+		);
+		expect(agenda).toContain("### Discussion topics");
+		expect(agenda).toContain("- [ ] Talk about growth");
+		expect(agenda).toContain("- [ ] Cover the incident review");
+	});
+
+	it("omits the topics heading when no topics are queued", async () => {
+		await service.createOneOnOne("Jane Doe", "2026-09-10", []);
+
+		const { body } = splitFrontmatter(
+			vault.getContent("Team/Jane Doe/1-on-1s/2026-09-10.md")!,
+		);
+		expect(body).not.toContain("Discussion topics");
+	});
+
+	it("carries an unticked discussion topic into the next note", async () => {
+		await service.createOneOnOne("Jane Doe", "2026-09-02", ["raise this"]);
+		await service.createOneOnOne("Jane Doe", "2026-09-10");
+
+		const { body } = splitFrontmatter(
+			vault.getContent("Team/Jane Doe/1-on-1s/2026-09-10.md")!,
+		);
+		// Unticked in the 2026-09-02 note → picked up as an open checkbox item.
+		expect(body).toContain("### Carried forward from 2026-09-02");
+		expect(body).toContain("- [ ] raise this");
 	});
 });
 
@@ -449,6 +489,46 @@ describe("registerOneOnOneCommands", () => {
 			const { frontmatter } = splitFrontmatter(vault.getContent(path)!);
 			expect(frontmatter.type).toBe("one-on-one");
 			expect(openedFiles.map((file) => file.path)).toEqual([path]);
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
+	it("drains queued topics into the note and empties the running list", async () => {
+		vi.useFakeTimers();
+		vi.setSystemTime(new Date(2026, 8, 10, 9, 0, 0)); // local 2026-09-10
+		try {
+			await seedNote(
+				vault,
+				"Team/Jane Doe/topics.md",
+				buildNote(
+					{ type: "topics", person: "Jane Doe" },
+					"\n## Discussion topics\n\n- queued topic\n",
+				),
+			);
+			await seedNote(
+				vault,
+				"Team/Bob/topics.md",
+				buildNote({ type: "topics", person: "Bob" }, "\n- bob topic\n"),
+			);
+
+			commands["teamsync-new-one-on-one"]?.callback();
+			await flush();
+			shownModal!.onChooseSuggestion("Jane Doe");
+			await flush();
+
+			const { body } = splitFrontmatter(
+				vault.getContent("Team/Jane Doe/1-on-1s/2026-09-10.md")!,
+			);
+			expect(body).toContain("### Discussion topics");
+			expect(body).toContain("- [ ] queued topic");
+
+			const topicsNote = splitFrontmatter(
+				vault.getContent("Team/Jane Doe/topics.md")!,
+			);
+			expect(topicsNote.body).not.toContain("- queued topic");
+			// Other people's lists are untouched.
+			expect(vault.getContent("Team/Bob/topics.md")).toContain("- bob topic");
 		} finally {
 			vi.useRealTimers();
 		}

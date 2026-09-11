@@ -18,7 +18,7 @@ edges:
     condition: when working on any AI feature or the Ollama integration boundary
   - target: patterns/INDEX.md
     condition: when starting a task — check the pattern index for a matching pattern file
-last_updated: 2026-09-10
+last_updated: 2026-09-11
 ---
 
 # Session Bootstrap
@@ -39,6 +39,7 @@ Then read this file fully before doing anything else in this session.
 
 - Dev plans (Phase 2, verified 2026-09-10): DevPlanService (create/get/markReviewed — byte-for-byte frontmatter rewrite + revision-log append), "Create development plan" / "Mark dev plan reviewed" commands, dashboard Dev-plan freshness column (`devPlanReviewDays`, default 90; exactly-at-threshold = stale)
 - Generate Overview (AI): "Generate Overview" command creates/replaces `Overview.md` per person from 1:1s + goals + dev plan via Ollama; send-preview + editable draft + explicit write button (never auto-written); `AIDraftModal` shared base for AI draft modals
+- Discussion topics (verified 2026-09-11): TopicService + per-person `topics.md` running queue (`type: topics`); "Add topic for discussion" / "Open discussion topics list" commands; **New 1:1 note** drains the queue into the agenda (`### Discussion topics`, unchecked boxes) and clears the list only after the note is created; topics.md bullet list is the second sanctioned body read (`extractTopics`, see `context/data-model.md` Discussion Topics Rule)
 - Contracts for the above pinned in `src/CONTRACTS.md`
 
 **Not yet built:**
@@ -46,7 +47,7 @@ Then read this file fully before doing anything else in this session.
 - Phase 4: pattern/theme summarization, draft assist, mobile (stretch)
 
 **Known issues:**
-- Stale services: `one-on-one.commands.ts` and `goal.commands.ts` construct their services once at registration; a settings change mid-session leaves them stale (person.commands.ts correctly builds per invocation)
+- Stale services: `goal.commands.ts` constructs its service once at registration; a settings change mid-session leaves it stale (person.commands.ts and one-on-one.commands.ts build per invocation)
 - `OneOnOneService.listActivePeople()` and `GoalService.listPersonNames()` are now unused (pickers consolidated onto `PersonService.listPeople()`) — candidates for retirement
 - Carry-forward heading `### Carried forward from <date>` is a literal in `one-on-one.service.ts`, not a template slot — accepted as generated dynamic content
 - Overdue threshold hardcoded at 21 days (`OVERDUE_THRESHOLD_DAYS` exported, not yet a setting)

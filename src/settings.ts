@@ -15,6 +15,8 @@ export interface TeamSyncSettings {
 	goalsFolder: string;
 	/** Person profile note filename inside a person folder. Default: '_index.md'. */
 	personIndexFile: string;
+	/** Per-person running list of queued 1:1 discussion topics. Default: 'topics.md'. */
+	topicsFile: string;
 	/** Development plan note filename inside a person folder. Default: 'Development-Plan.md'. */
 	devPlanFile: string;
 	/** Dev-plan review cadence in days; the dashboard flags plans not reviewed within this window. Default: 90. */
@@ -42,6 +44,7 @@ export const DEFAULT_SETTINGS: TeamSyncSettings = {
 	oneOnOnesFolder: "1-on-1s",
 	goalsFolder: "Goals",
 	personIndexFile: "_index.md",
+	topicsFile: "topics.md",
 	devPlanFile: "Development-Plan.md",
 	devPlanReviewDays: 90,
 	overviewFile: "Overview.md",
@@ -115,6 +118,22 @@ export class TeamSyncSettingTab extends PluginSettingTab {
 					.setValue(this.plugin.settings.personIndexFile)
 					.onChange(async (value) => {
 						this.plugin.settings.personIndexFile = value;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Discussion topics file")
+			.setDesc(
+				'Per-person running list of topics queued for the next 1:1 ("Add topic for discussion" command). ' +
+					"Creating a 1:1 note moves the queued topics into it and empties the list.",
+			)
+			.addText((text) =>
+				text
+					.setPlaceholder("topics.md")
+					.setValue(this.plugin.settings.topicsFile)
+					.onChange(async (value) => {
+						this.plugin.settings.topicsFile = value;
 						await this.plugin.saveSettings();
 					}),
 			);

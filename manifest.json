@@ -1,7 +1,7 @@
 {
 	"id": "teamsync",
 	"name": "TeamSync",
-	"version": "0.0.2",
+	"version": "0.0.3",
 	"minAppVersion": "1.4.0",
 	"description": "Run one-on-ones, track goals, and manage development plans for your direct reports — inside Obsidian, with optional local AI assistance via Ollama.",
 	"author": "Jared Henry",
